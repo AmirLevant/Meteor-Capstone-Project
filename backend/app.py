@@ -1,3 +1,4 @@
+from backend import database
 from flask import Flask
 app = Flask(__name__)
 
