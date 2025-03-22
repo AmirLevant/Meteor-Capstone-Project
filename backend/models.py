@@ -1,6 +1,4 @@
-import pymongo
-
-# Database Model for drivers
+# Database Model for drivers document
 class Driver:
     def __init__(self, name, email, password, latitude, longitude, last_update):
         self.name = name
