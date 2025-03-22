@@ -30,3 +30,10 @@ def get_driver_by_id(id: str):
     driver_data = drivers_collection.find_one({"_id": id})
     if driver_data:
         return models.Driver.from_dict(driver_data)
+    
+def delete_driver_by_id(id: str):
+    drivers_collection = db["drivers"]
+
+    delete_result = drivers_collection.delete_one({"_id:": id})
+    if delete_result:
+        return delete_result
