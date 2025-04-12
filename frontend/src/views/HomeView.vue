@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen relative">
+    <GeoErrorModal 
+      @closeGeoError="closeGeoError" 
+      v-if="geoError" 
+      :geoErrorMsg="geoErrorMsg"
+      />
+      <MapFeatures :coords="coords" :fetchCoords="fetchCoords" />
     <div id="map" class="h-full z-[1]"></div>
     
     <!-- Plow Status UI Panel on the right side -->
@@ -20,13 +26,6 @@
         </label>
       </div>
       
-      <!-- Location button now inside the panel -->
-      <button 
-        @click="findMyLocation" 
-        class="w-full flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition-colors"
-      >
-        <span class="mr-1">📍</span> Show My Location
-      </button>
     </div>
   </div>
 </template>
@@ -35,13 +34,16 @@
 import leaflet from 'leaflet';
 import { onMounted, ref, watch } from 'vue';
 import 'leaflet/dist/leaflet.css';
+import redMarker from '../assets/map-marker-plow.svg';
+import GeoErrorModal from '@/components/GeoErrorModal.vue';
+import MapFeatures from '@/components/MapFeatures.vue';
 
 export default {
   name: "HomeView",
-  components: {},
+  components: {GeoErrorModal, MapFeatures},
   setup() {
     let map;
-    let snowPlowMarker;
+    let plowMarker;
     const plowStatus = ref('active'); // Default status
     
     // Create custom icons for different statuses
@@ -104,7 +106,7 @@ export default {
         .addTo(map);
         
       // Add snow plow marker at the specified coordinates with initial status color
-      const snowPlowCoords = [43.47856, -80.51842]; // Converted from 43°28'42.8"N 80°31'06.3"W
+      const snowPlowCoords = [43.47656, -80.51842]; // Converted from 43°28'42.8"N 80°31'06.3"W
       const initialColor = statusColors[plowStatus.value];
       snowPlowMarker = leaflet.marker(snowPlowCoords, {
         icon: createCustomIcon(initialColor)
@@ -112,33 +114,101 @@ export default {
       
       // Set popup content and open it immediately to show status
       snowPlowMarker.bindPopup(`Snow Plow #1<br>Status: ${plowStatus.value.charAt(0).toUpperCase() + plowStatus.value.slice(1)}`).openPopup();
+
+      getGeolocation();
       
       // Ensure the map centers on the snow plow with appropriate zoom
-      map.setView(snowPlowCoords, 17);
+      //map.setView(snowPlowCoords, 17);
       
       // Handle location found event
-      map.on('locationfound', function(e) {
-        const radius = e.accuracy / 2;
+      //map.on('locationfound', function(e) {
+      //  const radius = e.accuracy / 2;
         
         // Create a marker at the location
-        const locationMarker = leaflet.marker(e.latlng).addTo(map)
-            .bindPopup(`You are within ${radius} meters from this point`).openPopup();
+      //  const locationMarker = leaflet.marker(e.latlng).addTo(map)
+      //      .bindPopup(`You are within ${radius} meters from this point`).openPopup();
         
         // Draw a circle showing the accuracy radius
-        leaflet.circle(e.latlng, radius).addTo(map);
-      });
+      //  leaflet.circle(e.latlng, radius).addTo(map);
+      //});
       
       // Handle location error
-      map.on('locationerror', function(e) {
+      //map.on('locationerror', function(e) {
         alert(e.message);
-      });
+      //});
     });
+
+    const coords = ref(null);
+    const fetchCoords = ref(null);
+    const geoMarker = ref(null);
+    const geoError = ref(null);
+    geoError.value = false;
+    const geoErrorMsg = ref("Testing v-bind on Modal");
+
+    const getGeolocation = () => {
+      // check session storage for coords
+      if (sessionStorage.getItem('coords'))
+      {
+        coords.value = JSON.parse(sessionStorage.getItem("coords"));
+        plotGeolocation(coords.value);
+        return;
+      }
+      fetchCoords.value = true;
+      navigator.geolocation.getCurrentPosition(setCoords, getLocError);
+    }
+
+    const setCoords = (pos) => {
+      // stop fetching coords
+      fetchCoords.value = null;
+
+      // set coords in session storage
+      const setSessionCoords = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      };
+
+      sessionStorage.setItem('coords', JSON.stringify(setSessionCoords));
+
+      // set ref coords value
+      coords.value = setSessionCoords;
+
+      plotGeolocation(coords.value);
+    }
+
+    const getLocError = (err) => {
+      fetchCoords.value = null;
+      geoError.value = true;
+      geoErrorMsg.value = err.message;
+    }
+
+    const plotGeolocation = (coords) => {
+      // create custom marker
+      const customMarker = leaflet.icon({
+        iconUrl: plowMarker,
+        iconSize: [35, 35],
+      });
+
+      // create new marker with coords and custom icon
+      geoMarker.value = leaflet.marker([coords.lat, coords.lng], {icon: customMarker })
+      .addTo(map);
+
+      // set map view to current location
+      map.setView([coords.lat, coords.lng], 16);
+    };
+
+    const closeGeoError = () =>
+      {
+        console.log("Closing modal...");
+        geoError.value = false;
+        geoErrorMsg.value = null;
+        console.log(geoError.value)
+      };
     
     return {
       plowStatus,
-      findMyLocation
+      coords, fetchCoords, geoMarker, closeGeoError, geoError, geoErrorMsg
     };
-  }
+  },
 };
 </script>
 
