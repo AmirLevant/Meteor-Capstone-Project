@@ -43,7 +43,7 @@ export default {
   components: {GeoErrorModal, MapFeatures},
   setup() {
     let map;
-    let plowMarker;
+    let snowPlowMarker;
     const plowStatus = ref('active'); // Default status
     
     // Create custom icons for different statuses
@@ -184,7 +184,7 @@ export default {
     const plotGeolocation = (coords) => {
       // create custom marker
       const customMarker = leaflet.icon({
-        iconUrl: plowMarker,
+        iconUrl: redMarker,
         iconSize: [35, 35],
       });
 
@@ -208,7 +208,7 @@ export default {
       plowStatus,
       coords, fetchCoords, geoMarker, closeGeoError, geoError, geoErrorMsg
     };
-  },
+  }
 };
 </script>
 
