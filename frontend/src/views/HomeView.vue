@@ -1,12 +1,39 @@
 <template>
   <div class="h-screen relative">
     <div id="map" class="h-full z-[1]"></div>
+    
+    <!-- Plow Status UI Panel on the right side -->
+    <div class="absolute top-4 right-4 bg-white p-3 rounded-md shadow-md z-10">
+      <h3 class="text-lg font-semibold mb-2">Snow Plow Status</h3>
+      <div class="flex flex-col space-y-2 mb-3">
+        <label class="flex items-center cursor-pointer">
+          <input type="radio" name="plowStatus" value="active" v-model="plowStatus" class="mr-2">
+          <span class="text-green-600 font-medium">Active</span>
+        </label>
+        <label class="flex items-center cursor-pointer">
+          <input type="radio" name="plowStatus" value="idle" v-model="plowStatus" class="mr-2">
+          <span class="text-yellow-500 font-medium">Idle</span>
+        </label>
+        <label class="flex items-center cursor-pointer">
+          <input type="radio" name="plowStatus" value="inactive" v-model="plowStatus" class="mr-2">
+          <span class="text-red-600 font-medium">Inactive</span>
+        </label>
+      </div>
+      
+      <!-- Location button now inside the panel -->
+      <button 
+        @click="findMyLocation" 
+        class="w-full flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition-colors"
+      >
+        <span class="mr-1">📍</span> Show My Location
+      </button>
+    </div>
   </div>
 </template>
 
 <script>
 import leaflet from 'leaflet';
-import { onMounted } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import 'leaflet/dist/leaflet.css';
 
 export default {
@@ -14,11 +41,51 @@ export default {
   components: {},
   setup() {
     let map;
+    let snowPlowMarker;
+    const plowStatus = ref('active'); // Default status
+    
+    // Create custom icons for different statuses
+    const createCustomIcon = (color) => {
+      return leaflet.divIcon({
+        className: `custom-marker ${color}-marker`,
+        html: `<div style="width: 24px; height: 24px; background-color: ${color}; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+      });
+    };
+    
+    // Status color mapping
+    const statusColors = {
+      active: '#22c55e', // green-600
+      idle: '#eab308',   // yellow-500
+      inactive: '#dc2626' // red-600
+    };
+    
+    // Watch for changes in the plow status
+    watch(plowStatus, (newStatus) => {
+      if (snowPlowMarker) {
+        // Update the marker popup content
+        snowPlowMarker.setPopupContent(`Snow Plow #1<br>Status: ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`);
+        
+        // Change marker icon based on status
+        const color = statusColors[newStatus];
+        snowPlowMarker.setIcon(createCustomIcon(color));
+      }
+    });
+    
+    // Function to find user location
+    const findMyLocation = () => {
+      if (map) {
+        map.locate({setView: true, maxZoom: 16});
+      }
+    };
+    
     onMounted(() => {
       //init map
       map = leaflet.map('map').setView([43.479509, -80.518162], 17);
-      console.log("hello")
-      console.log(import.meta.env.VITE_API_KEY)
+      console.log("hello");
+      console.log(import.meta.env.VITE_API_KEY);
       
       // add tile layer
       leaflet
@@ -36,33 +103,18 @@ export default {
         )
         .addTo(map);
         
-      // Add snow plow marker at the specified coordinates - using basic implementation that doesn't require extra plugins
+      // Add snow plow marker at the specified coordinates with initial status color
       const snowPlowCoords = [43.47856, -80.51842]; // Converted from 43°28'42.8"N 80°31'06.3"W
-      const snowPlowMarker = leaflet.marker(snowPlowCoords).addTo(map);
-      snowPlowMarker.bindPopup('Snow Plow #1<br>Status: Active');
+      const initialColor = statusColors[plowStatus.value];
+      snowPlowMarker = leaflet.marker(snowPlowCoords, {
+        icon: createCustomIcon(initialColor)
+      }).addTo(map);
       
-      // Add a simple geolocation button without requiring the plugin
-      const locationButton = leaflet.control({position: 'topright'});
+      // Set popup content and open it immediately to show status
+      snowPlowMarker.bindPopup(`Snow Plow #1<br>Status: ${plowStatus.value.charAt(0).toUpperCase() + plowStatus.value.slice(1)}`).openPopup();
       
-      locationButton.onAdd = function() {
-        const button = leaflet.DomUtil.create('button', 'location-button');
-        button.innerHTML = '📍';
-        button.title = "Show my location";
-        button.style.fontSize = '20px';
-        button.style.padding = '5px 10px';
-        button.style.backgroundColor = 'white';
-        button.style.border = '2px solid rgba(0,0,0,0.2)';
-        button.style.borderRadius = '4px';
-        button.style.cursor = 'pointer';
-        
-        button.onclick = function() {
-          map.locate({setView: true, maxZoom: 16});
-        };
-        
-        return button;
-      };
-      
-      locationButton.addTo(map);
+      // Ensure the map centers on the snow plow with appropriate zoom
+      map.setView(snowPlowCoords, 17);
       
       // Handle location found event
       map.on('locationfound', function(e) {
@@ -81,6 +133,20 @@ export default {
         alert(e.message);
       });
     });
+    
+    return {
+      plowStatus,
+      findMyLocation
+    };
   }
 };
 </script>
+
+<style>
+/* Custom marker styling */
+.custom-marker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+</style>
