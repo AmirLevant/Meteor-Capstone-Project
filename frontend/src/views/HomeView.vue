@@ -34,7 +34,8 @@
 import leaflet from 'leaflet';
 import { onMounted, ref, watch } from 'vue';
 import 'leaflet/dist/leaflet.css';
-import redMarker from '../assets/map-marker-plow.svg';
+import redMarker from '../assets/map-marker-blue.svg';
+import redPin from '../assets/map-marker-red.svg';
 import GeoErrorModal from '@/components/GeoErrorModal.vue';
 import MapFeatures from '@/components/MapFeatures.vue';
 
@@ -45,6 +46,8 @@ export default {
     let map;
     let snowPlowMarker;
     const plowStatus = ref('active'); // Default status
+    const clickedCoords = ref(null);
+    const clickedMarker = ref(null);
     
     // Create custom icons for different statuses
     const createCustomIcon = (color) => {
@@ -82,6 +85,13 @@ export default {
         map.locate({setView: true, maxZoom: 16});
       }
     };
+
+    // Pin for Radius selections
+    const redPinIcon = leaflet.icon({
+      iconUrl: redPin,
+      iconSize: [35, 35], // adjust as needed
+      iconAnchor: [17, 35], // anchor point so it sits properly
+    });
     
     onMounted(() => {
       //init map
@@ -108,6 +118,7 @@ export default {
       // Add snow plow marker at the specified coordinates with initial status color
       const snowPlowCoords = [43.47656, -80.51842]; // Converted from 43°28'42.8"N 80°31'06.3"W
       const initialColor = statusColors[plowStatus.value];
+
       snowPlowMarker = leaflet.marker(snowPlowCoords, {
         icon: createCustomIcon(initialColor)
       }).addTo(map);
@@ -116,26 +127,23 @@ export default {
       snowPlowMarker.bindPopup(`Snow Plow #1<br>Status: ${plowStatus.value.charAt(0).toUpperCase() + plowStatus.value.slice(1)}`).openPopup();
 
       getGeolocation();
-      
-      // Ensure the map centers on the snow plow with appropriate zoom
-      //map.setView(snowPlowCoords, 17);
-      
-      // Handle location found event
-      //map.on('locationfound', function(e) {
-      //  const radius = e.accuracy / 2;
-        
-        // Create a marker at the location
-      //  const locationMarker = leaflet.marker(e.latlng).addTo(map)
-      //      .bindPopup(`You are within ${radius} meters from this point`).openPopup();
-        
-        // Draw a circle showing the accuracy radius
-      //  leaflet.circle(e.latlng, radius).addTo(map);
-      //});
-      
-      // Handle location error
-      //map.on('locationerror', function(e) {
-        alert(e.message);
-      //});
+
+      // Store clicked coordinates for radius
+      map.on('click', function (e) {
+        const { lat, lng } = e.latlng;
+        clickedCoords.value = { lat, lng };
+        console.log("Clicked coordinates:", clickedCoords.value);
+
+        // Remove existing marker if one exists
+        if (clickedMarker.value && map.hasLayer(clickedMarker.value)) {
+          map.removeLayer(clickedMarker.value);
+        }
+
+        // Add a new marker at the clicked location
+        clickedMarker.value = leaflet.marker([lat, lng], { icon: redPinIcon }).addTo(map);
+        });
+
+      alert(e.message);
     });
 
     const coords = ref(null);
@@ -206,7 +214,8 @@ export default {
     
     return {
       plowStatus,
-      coords, fetchCoords, geoMarker, closeGeoError, geoError, geoErrorMsg
+      coords, fetchCoords, geoMarker, closeGeoError, geoError, geoErrorMsg,
+      clickedCoords
     };
   }
 };
