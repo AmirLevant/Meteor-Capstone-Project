@@ -27,7 +27,23 @@
       </div>
       
     </div>
+
+      <!-- Radius slider in bottom-left corner -->
+      <div class="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-md z-10 w-64">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Radius (m)</label>
+        <input 
+          type="range" 
+          min="100" 
+          max="2000" 
+          step="100" 
+          v-model="radius" 
+          class="w-full"
+        />
+        <p class="text-sm text-gray-600 mt-1">{{ radius }} meters</p>
+      </div>
   </div>
+
+
 </template>
 
 <script>
@@ -48,6 +64,8 @@ export default {
     const plowStatus = ref('active'); // Default status
     const clickedCoords = ref(null);
     const clickedMarker = ref(null);
+    const radius = ref(500); // default radius in meters
+    const radiusCircle = ref(null); // for the Leaflet circle
     
     // Create custom icons for different statuses
     const createCustomIcon = (color) => {
@@ -76,6 +94,14 @@ export default {
         // Change marker icon based on status
         const color = statusColors[newStatus];
         snowPlowMarker.setIcon(createCustomIcon(color));
+      }
+    });
+
+    // Watch for changes in the radius size
+    watch(radius, (newRadius) => {
+      console.log("Radius changed to:", newRadius);
+      if (radiusCircle.value) {
+        radiusCircle.value.setRadius(newRadius);
       }
     });
     
@@ -129,21 +155,30 @@ export default {
       getGeolocation();
 
       // Store clicked coordinates for radius
-      map.on('click', function (e) {
-        const { lat, lng } = e.latlng;
-        clickedCoords.value = { lat, lng };
-        console.log("Clicked coordinates:", clickedCoords.value);
+      map.on('click', (e) => {
+        const latlng = e.latlng;
 
-        // Remove existing marker if one exists
-        if (clickedMarker.value && map.hasLayer(clickedMarker.value)) {
-          map.removeLayer(clickedMarker.value);
+        // Place or move the marker
+        if (!clickedMarker.value) {
+          clickedMarker.value = leaflet.marker(latlng, { icon: redPinIcon }).addTo(map);
+        } else {
+          clickedMarker.value.setLatLng(latlng);
         }
 
-        // Add a new marker at the clicked location
-        clickedMarker.value = leaflet.marker([lat, lng], { icon: redPinIcon }).addTo(map);
-        });
+        // Place or update the circle
+        if (!radiusCircle.value) {
+          radiusCircle.value = leaflet.circle(latlng, {
+            radius: radius.value,
+            color: '#3b82f6', // Tailwind blue-500
+            fillColor: '#93c5fd', // Tailwind blue-300
+            fillOpacity: 0.3
+          }).addTo(map);
+        } else {
+          radiusCircle.value.setLatLng(latlng);
+        }
+      });
 
-      alert(e.message);
+      //alert(e.message);
     });
 
     const coords = ref(null);
@@ -215,7 +250,8 @@ export default {
     return {
       plowStatus,
       coords, fetchCoords, geoMarker, closeGeoError, geoError, geoErrorMsg,
-      clickedCoords
+      clickedCoords,
+      radius
     };
   }
 };
