@@ -157,6 +157,7 @@ export default {
       // Store clicked coordinates for radius
       map.on('click', (e) => {
         const latlng = e.latlng;
+        const {lat, lng } = e.latlng;
 
         // Place or move the marker
         if (!clickedMarker.value) {
@@ -164,6 +165,9 @@ export default {
         } else {
           clickedMarker.value.setLatLng(latlng);
         }
+
+        clickedCoords.value = { lat, lng };
+        console.log("Clicked coordinates: ", clickedCoords.value);
 
         // Place or update the circle
         if (!radiusCircle.value) {
