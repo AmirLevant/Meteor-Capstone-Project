@@ -6,5 +6,20 @@ export const api = {
   async getPlows() {
     const response = await axios.get(`${API_BASE_URL}/api/plows`)
     return response.data
+  },
+  
+  async getPlowById(id: number) {
+    const response = await axios.get(`${API_BASE_URL}/api/plows/${id}`)
+    return response.data
+  },
+  
+  async createPlow(plowData: any) {
+    const response = await axios.post(`${API_BASE_URL}/api/plows/`, plowData)
+    return response.data
+  },
+  
+  async updatePlowStatus(id: number, status: any) {
+    const response = await axios.patch(`${API_BASE_URL}/api/plows/${id}/status`, status)
+    return response.data
   }
 }
