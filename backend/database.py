@@ -40,6 +40,30 @@ def delete_driver_by_id(id: str):
     if delete_result:
         return delete_result
 
+# Finds a driver by name from the database
+def get_driver_by_name(name: str):
+    drivers_collection = db["drivers"]
+    driver_data = drivers_collection.find_one({"name": name})
+    if driver_data:
+        return driver_data
+
+# Updates an existing drivers location based on given email
+def update_driver_location(email: str, longitude: float, latitude: float, timestamp: str):
+    drivers_collection = db["drivers"]
+    update = {
+        "$set": {
+            "location": {
+                "type": "Point",
+                "coordinates": [longitude, latitude]
+            },
+            "last_update": timestamp
+        }
+    }
+    result = drivers_collection.update_one({"email": email}, update)
+    return result.modified_count > 0
+
+
+
 #######################################################################################################
 
 # Historical Data Functions:
@@ -129,6 +153,16 @@ def delete_route_by_id(id: str):
     collection = db["routes"]
     result = collection.delete_one({"_id": ObjectId(id)})
     return result
+
+# Allows adding a driver to the route.
+def assign_driver_to_route(route_id: str, driver_id: str):
+    collection = db["routes"]
+    result = collection.update_one(
+        {"_id": ObjectId(route_id)},
+        {"$set": {"driver_id": driver_id}}
+    )
+    return result
+
 
 #######################################################################################################
 
