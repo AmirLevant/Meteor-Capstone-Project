@@ -48,14 +48,18 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
+const appStore = useAppStore()
 
 const selectManager = () => {
+  appStore.setUserType('manager')
   router.push('/manager')
 }
 
 const selectDriver = () => {
+  appStore.setUserType('driver')
   router.push('/driver')
 }
 </script>
