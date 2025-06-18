@@ -1,13 +1,16 @@
 # required imports
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+
 from urllib import response
+
 from dotenv import load_dotenv
 import os
 
 import sys
 
 sys.path.append('..') # Needed for the app.py to index and view the controllers folder
+import requests
 import database
 import models
 
@@ -64,13 +67,14 @@ def optimized_route():
         'destination': 'last'
     }
 
-    #Inserts route into database
+    response = requests.get(url, params=params)
+
     route_data = response.json()
     route = models.Route(driver_id=None, route_json=route_data)
-    inserted_id = database.insert_route(route)
+    database.insert_route(route)
 
-    route = request.get(url, params=params)
-    return jsonify(response.json())
+    return jsonify(route_data)
+
 
 # Allows for the adding of a driver to an existing route in the database
 @meteor_app.route('/api/assign_driver', methods=['POST'])
@@ -89,11 +93,16 @@ def assign_driver():
     driver_id = str(driver_data["_id"])
     success = database.assign_driver_to_route(route_id, driver_id)
 
-# Allows for the front-end to add a driver to the database.
+    if not success:
+        return jsonify({"error": "Failed to assign driver to route"}), 500
+    return jsonify({"message": "Driver assigned successfully"})
+
+
+# Allows for the front-end to add a driver to the database without adding a location.
 @meteor_app.route('/api/driver', methods=['POST'])
 def add_driver():
     data = request.json
-    required = ["name", "email", "password", "latitude", "longitude", "last_update"]
+    required = ["name", "email", "password"]
     if not all(field in data for field in required):
         return jsonify({"error": "Missing required driver fields"}), 400
 
@@ -101,14 +110,15 @@ def add_driver():
         name=data["name"],
         email=data["email"],
         password=data["password"],
-        latitude=data["latitude"],
-        longitude=data["longitude"],
-        last_update=data["last_update"]
+        position_id=None
     )
+    driver_id = database.insert_driver(driver)
+
+    return jsonify({"message": "Driver added successfully", "driver_id": driver_id}), 201
 
 # Allow for updating an existing driver's location by giving a geoJSON
 @meteor_app.route('/api/driver/location', methods=['PUT'])
-def update_driver_pos():
+def update_driver_position():
     data = request.json
     required = ["email", "location", "last_update"]
     if not all(field in data for field in required):
@@ -132,7 +142,7 @@ def update_driver_pos():
 
 # Allows for getting an existing driver's location in GeoJSON format
 @meteor_app.route('/api/driver/location', methods=['GET'])
-def get_driver_location():
+def get_driver_position():
     email = request.args.get("email")
     if not email:
         return jsonify({"error": "Email query parameter is required"}), 400
@@ -141,20 +151,19 @@ def get_driver_location():
     if not driver:
         return jsonify({"error": "Driver not found"}), 404
 
-    geojson_feature = {
+    position = database.get_position_by_id(driver.position_id)
+    if not position:
+        return jsonify({"error": "Position not found"}), 404
+
+    geojson = {
         "type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": driver.location["coordinates"]
-        },
+        "geometry": position.location,
         "properties": {
-            "name": driver.name,
-            "email": driver.email,
-            "last_update": driver.last_update
+            "last_update": position.last_update
         }
     }
 
-    return jsonify(geojson_feature)
+    return jsonify(geojson)
 
 if __name__ == '__main__':
     meteor_app.run()
