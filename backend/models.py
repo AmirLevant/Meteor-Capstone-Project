@@ -1,35 +1,50 @@
 # Database Model for drivers document
 class Driver:
-    def __init__(self, name, email, password, longitude, latitude, last_update):
+    def __init__(self, name, email, password, position_id):
         self.name = name
         self.email = email
         self.password = password
-        self.location = {
-            "type": "Point",
-            "coordinates": [longitude, latitude]
-        }
-        self.last_update = last_update
+        self.position_id = position_id  # This is now a reference to positions._id
 
-    # Converts the object into a dict for inserting into mongodb
     def to_dict(self):
         return {
             "name": self.name,
             "email": self.email,
             "password": self.password,
-            "last_update": self.last_update,
-            "location": self.location
+            "position_id": self.position_id
         }
 
-    # Converts the object from a dict into an object for retrieving from mongodb
+    @staticmethod
     def from_dict(data):
         return Driver(
             name=data["name"],
             email=data["email"],
             password=data["password"],
-            longitude=data["location"]["coordinates"][0],
-            latitude=data["location"]["coordinates"][1],
+            position_id=data.get("position_id")
+        )
+
+
+# Database Model for positions document  
+class Position:
+    def __init__(self, location, last_update):
+        self.location = location  # Our driver's GeoJSON file
+        self.last_update = last_update
+
+    # Converts the object into a dict for inserting into mongodb
+    def to_dict(self):
+        return {
+            "location": self.location,
+            "last_update": self.last_update
+        }
+    
+    # Converts the object from a dict into an object for retrieving from mongodb
+    @staticmethod
+    def from_dict(data):
+        return Position(
+            location=data["location"],
             last_update=data["last_update"]
         )
+
 
 # Database Model for historial_data document
 class HistoricalData:

@@ -50,20 +50,51 @@ def get_driver_by_name(name: str):
 
 # Updates an existing drivers location based on given email
 def update_driver_location(email: str, longitude: float, latitude: float, timestamp: str):
-    drivers_collection = db["drivers"]
-    update = {
-        "$set": {
-            "location": {
-                "type": "Point",
-                "coordinates": [longitude, latitude]
-            },
-            "last_update": timestamp
-        }
+    driver = get_driver_by_email(email)
+    if not driver or not driver.position_id:
+        return False
+    
+    new_location = {
+        "type": "Point",
+        "coordinates": [longitude, latitude]
     }
-    result = drivers_collection.update_one({"email": email}, update)
-    return result.modified_count > 0
 
+    updated = update_position_by_id(driver.position_id, new_location, timestamp)
+    return updated > 0
 
+#######################################################################################################
+
+# Position Functions:
+
+# Inserts a position into the database
+def insert_position(position: models.Position):
+    collection = db["positions"]
+    result = collection.insert_one(position.to_dict())
+    return str(result.inserted_id)
+
+# Gets a position from the database by ID and returns it as a Position object
+def get_position_by_id(id: str):
+    collection = db["positions"]
+    data = collection.find_one({"_id": ObjectId(id)})
+    if data:
+        return models.Position.from_dict(data)
+
+# Updates a position by ID by id by taking the new geoJSON location information and the timestamp
+def update_position_by_id(id: str, new_location, new_timestamp):
+    collection = db["positions"]
+    result = collection.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": {
+            "location": new_location,
+            "last_update": new_timestamp
+        }}
+    )
+    return result.modified_count
+
+# Deletes a position by ID from the database then returns the id of the deleted position
+def delete_position_by_id(id: str):
+    collection = db["positions"]
+    return collection.delete_one({"_id": ObjectId(id)})
 
 #######################################################################################################
 
