@@ -1,10 +1,13 @@
 # Database Model for drivers document
 class Driver:
-    def __init__(self, name, email, password, latitude, longitude, last_update):
+    def __init__(self, name, email, password, longitude, latitude, last_update):
         self.name = name
         self.email = email
         self.password = password
-        self.location = {"latitude": latitude, "longitude": longitude}
+        self.location = {
+            "type": "Point",
+            "coordinates": [longitude, latitude]
+        }
         self.last_update = last_update
 
     # Converts the object into a dict for inserting into mongodb
@@ -23,8 +26,8 @@ class Driver:
             name=data["name"],
             email=data["email"],
             password=data["password"],
-            latitude=data["location"]["latitude"],
-            longitude=data["location"]["longitude"],
+            longitude=data["location"]["coordinates"][0],
+            latitude=data["location"]["coordinates"][1],
             last_update=data["last_update"]
         )
 
@@ -83,32 +86,21 @@ class Road:
 
 # Database Model for route document
 class Route:
-    def __init__(self, driver_id, route_id, start_latitude, start_longitude, end_latitude, end_longitude):
+    def __init__(self, driver_id, route_json):
         self.driver_id = driver_id
-        self.route_id = route_id
-        self.start_point = {"latitude": start_latitude, "longitude": start_longitude}
-        self.end_point = {"latitude": end_latitude, "longitude": end_longitude}
+        self.route_json = route_json
 
     def to_dict(self):
         return {
-            "route_information": {
-                "driver_id": self.driver_id,
-                "route_id": self.route_id,
-                "start_point": self.start_point,
-                "end_point": self.end_point
-            }
+            "driver_id": self.driver_id,
+            "route_data": self.route_json  # store full Mapbox response here
         }
 
     @staticmethod
     def from_dict(data):
-        info = data["route_information"]
         return Route(
-            driver_id=info["driver_id"],
-            route_id=info["route_id"],
-            start_latitude=info["start_point"]["latitude"],
-            start_longitude=info["start_point"]["longitude"],
-            end_latitude=info["end_point"]["latitude"],
-            end_longitude=info["end_point"]["longitude"]
+            driver_id=data.get("driver_id"),
+            route_json=data.get("route_data")
         )
 
 # Database Model for snow_condition document
