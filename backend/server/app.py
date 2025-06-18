@@ -1,14 +1,18 @@
 # required imports
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import requests
-import database
-import models
+
+from urllib import response
+
 from dotenv import load_dotenv
 import os
 
 import sys
+
 sys.path.append('..') # Needed for the app.py to index and view the controllers folder
+import requests
+import database
+import models
 
 load_dotenv() # Needed for getting the environmental variable API_KEY from the .env file
 API_KEY = os.getenv('API_KEY')

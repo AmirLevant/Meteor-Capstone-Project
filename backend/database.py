@@ -1,5 +1,5 @@
 import pymongo
-from backend import models
+import models
 from bson import ObjectId
 
 client = pymongo.MongoClient("mongodb+srv://admin:manateesareverycool1@cluster0.d2uan.mongodb.net/")
