@@ -67,8 +67,17 @@
             >
               {{ pinModeActive ? 'Cancel Pin Mode' : 'Set Coverage Area' }}
             </button>
-            <button class="w-full bg-green-600 text-white rounded-lg px-4 py-2 hover:bg-green-700 transition-colors">
-              Create New Route
+            <button 
+              @click="createNewRoute"
+              :disabled="!coveragePin"
+              :class="[
+                'w-full rounded-lg px-4 py-2 transition-colors',
+                coveragePin 
+                  ? 'bg-green-600 hover:bg-green-700 text-white' 
+                  : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+              ]"
+            >
+              {{ routeLoading ? 'Creating Route...' : 'Create New Route' }}
             </button>
           </div>
 
@@ -166,6 +175,7 @@ import { useAppStore } from '@/stores/app'
 import { usePlowStore } from '@/stores/plow'
 import MapDisplay from '@/components/MapDisplay.vue'
 import leaflet from 'leaflet'
+import { api } from '@/services/api'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -179,6 +189,8 @@ const showRadiusControl = ref(true)
 const mapInstance = ref(null)
 const currentMarker = ref(null)
 const currentCircle = ref(null)
+const routeLoading = ref(false)
+const routeData = ref(null)
 
 // Configuration
 const minRadius = 0.5
@@ -230,7 +242,41 @@ const setCoveragePin = (coords) => {
 const clearCoverageArea = () => {
   coveragePin.value = null
   showRadiusControl.value = false
+  routeData.value = null
   clearMapDisplay()
+}
+
+const createNewRoute = async () => {
+  if (!coveragePin.value) {
+    alert('Please set a coverage area first')
+    return
+  }
+
+  routeLoading.value = true
+  
+  try {
+    const data = await api.createRoute(
+      {
+        lat: coveragePin.value.lat,
+        lng: coveragePin.value.lng
+      },
+      radiusKm.value
+    )
+    
+    console.log('Route created:', data)
+    routeData.value = data
+    
+    // Display the route on the map
+    displayRouteOnMap(data.roads)
+    
+    alert(`Route created successfully! Found ${data.roads?.length || 0} road segments.`)
+    
+  } catch (error) {
+    console.error('Error creating route:', error)
+    alert('Failed to create route. Please try again.')
+  } finally {
+    routeLoading.value = false
+  }
 }
 
 const setRadiusPreset = (value) => {
@@ -296,6 +342,43 @@ const clearMapDisplay = () => {
   if (currentCircle.value) {
     mapInstance.value.removeLayer(currentCircle.value)
     currentCircle.value = null
+  }
+  // Clear any route overlays
+  clearRouteDisplay()
+}
+
+const displayRouteOnMap = (roads) => {
+  if (!roads || !mapInstance.value) return
+  
+  const L = window.L || leaflet
+  
+  roads.forEach(road => {
+    if (road.geometry && road.geometry.coordinates) {
+      // Convert coordinates to Leaflet format [lat, lng]
+      const latlngs = road.geometry.coordinates.map(coord => [coord[1], coord[0]])
+      
+      // Add road as a polyline
+      const polyline = L.polyline(latlngs, {
+        color: '#ff6b35',
+        weight: 3,
+        opacity: 0.8
+      }).addTo(mapInstance.value)
+      
+      // Store reference for cleanup
+      if (!routeData.value.mapLayers) {
+        routeData.value.mapLayers = []
+      }
+      routeData.value.mapLayers.push(polyline)
+    }
+  })
+}
+
+const clearRouteDisplay = () => {
+  if (routeData.value?.mapLayers) {
+    routeData.value.mapLayers.forEach(layer => {
+      mapInstance.value.removeLayer(layer)
+    })
+    routeData.value.mapLayers = []
   }
 }
 
