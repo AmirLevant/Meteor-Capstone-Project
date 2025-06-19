@@ -32,7 +32,6 @@ CORS(meteor_app, resources={
 
 meteor_app.register_blueprint(plow_bp)
 
-
 @meteor_app.route('/') # when someone visits the root URL, we run the function home
 def home():
     return "Meteor App is running!"
@@ -113,6 +112,49 @@ def create_route():
             'success': False,
             'error': 'Failed to create route',
             'details': str(e)
+        }), 500
+
+# NEW: Get all routes
+@meteor_app.route('/api/routes', methods=['GET'])
+def get_routes():
+    """Get all active routes"""
+    try:
+        routes_list = list(active_routes.values())
+        print(f"Returning {len(routes_list)} routes")
+        return jsonify({
+            'success': True,
+            'routes': routes_list,
+            'count': len(routes_list)
+        })
+    except Exception as e:
+        print(f"Error getting routes: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get routes'
+        }), 500
+
+# NEW: Get route by ID
+@meteor_app.route('/api/routes/<route_id>', methods=['GET'])
+def get_route_by_id(route_id):
+    """Get a specific route by ID"""
+    try:
+        if route_id in active_routes:
+            print(f"Returning route {route_id}")
+            return jsonify({
+                'success': True,
+                'route': active_routes[route_id]
+            })
+        else:
+            print(f"Route {route_id} not found. Available routes: {list(active_routes.keys())}")
+            return jsonify({
+                'success': False,
+                'error': 'Route not found'
+            }), 404
+    except Exception as e:
+        print(f"Error getting route {route_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get route'
         }), 500
 
 def get_roads_within_radius(center, radius_km):
