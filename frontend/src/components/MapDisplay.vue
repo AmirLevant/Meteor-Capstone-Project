@@ -3,7 +3,6 @@
     <div :id="mapId" class="h-full w-full"></div>
   </div>
 </template>
-
 <script setup>
 import { onMounted, onUnmounted, watch } from 'vue'
 import leaflet from 'leaflet'
@@ -44,12 +43,13 @@ const emit = defineEmits(['mapClick', 'mapReady'])
 
 let map = null
 let markers = []
+let circles = []
 
 // Initialize map
 const initMap = () => {
   // Create map instance
   map = leaflet.map(props.mapId).setView(props.center, props.zoom)
-  
+ 
   // Add Mapbox tile layer
   leaflet
     .tileLayer(
@@ -65,14 +65,17 @@ const initMap = () => {
       }
     )
     .addTo(map)
-  
+ 
   // Add click handler for manager view
   if (props.userType === 'manager') {
     map.on('click', (e) => {
       emit('mapClick', { lat: e.latlng.lat, lng: e.latlng.lng })
     })
   }
-  
+
+  // Make Leaflet globally accessible for radius functionality
+  window.L = leaflet
+ 
   // Emit that map is ready
   emit('mapReady', map)
 }
@@ -84,10 +87,49 @@ const addMarker = (lat, lng, options = {}) => {
   return marker
 }
 
+// Add a custom marker (for coverage pins)
+const addCustomMarker = (lat, lng, customIcon) => {
+  const marker = leaflet.marker([lat, lng], { icon: customIcon }).addTo(map)
+  markers.push(marker)
+  return marker
+}
+
+// Add a circle to the map
+const addCircle = (lat, lng, radius, options = {}) => {
+  const defaultOptions = {
+    fillColor: '#3b82f6',
+    fillOpacity: 0.1,
+    color: '#3b82f6',
+    weight: 2,
+    opacity: 0.6
+  }
+  
+  const circle = leaflet.circle([lat, lng], {
+    radius: radius, // radius in meters
+    ...defaultOptions,
+    ...options
+  }).addTo(map)
+  
+  circles.push(circle)
+  return circle
+}
+
 // Clear all markers
 const clearMarkers = () => {
   markers.forEach(marker => marker.remove())
   markers = []
+}
+
+// Clear all circles
+const clearCircles = () => {
+  circles.forEach(circle => circle.remove())
+  circles = []
+}
+
+// Clear all overlays (markers and circles)
+const clearAllOverlays = () => {
+  clearMarkers()
+  clearCircles()
 }
 
 // Update map center
@@ -97,6 +139,44 @@ const setCenter = (lat, lng, zoom = null) => {
       map.setView([lat, lng], zoom)
     } else {
       map.setView([lat, lng])
+    }
+  }
+}
+
+// Fit map to show bounds
+const fitBounds = (bounds, options = {}) => {
+  if (map && bounds) {
+    map.fitBounds(bounds, options)
+  }
+}
+
+// Create a custom div icon
+const createDivIcon = (html, className = '', iconSize = [16, 16]) => {
+  return leaflet.divIcon({
+    className: className,
+    html: html,
+    iconSize: iconSize,
+    iconAnchor: [iconSize[0] / 2, iconSize[1] / 2]
+  })
+}
+
+// Get map instance (for external manipulation)
+const getMapInstance = () => map
+
+// Remove specific marker or circle
+const removeLayer = (layer) => {
+  if (map && layer) {
+    map.removeLayer(layer)
+    
+    // Remove from tracking arrays
+    const markerIndex = markers.indexOf(layer)
+    if (markerIndex > -1) {
+      markers.splice(markerIndex, 1)
+    }
+    
+    const circleIndex = circles.indexOf(layer)
+    if (circleIndex > -1) {
+      circles.splice(circleIndex, 1)
     }
   }
 }
@@ -123,8 +203,16 @@ watch(() => props.center, (newCenter) => {
 // Expose methods for parent components to use
 defineExpose({
   addMarker,
+  addCustomMarker,
+  addCircle,
   clearMarkers,
+  clearCircles,
+  clearAllOverlays,
   setCenter,
+  fitBounds,
+  createDivIcon,
+  removeLayer,
+  getMapInstance,
   map: () => map
 })
 </script>
@@ -144,28 +232,28 @@ defineExpose({
 .leaflet-pane {
   z-index: 200 !important;
 }
-
 .leaflet-tile-pane {
   z-index: 200 !important;
 }
-
 .leaflet-overlay-pane {
   z-index: 400 !important;
 }
-
 .leaflet-shadow-pane {
   z-index: 500 !important;
 }
-
 .leaflet-marker-pane {
   z-index: 600 !important;
 }
-
 .leaflet-tooltip-pane {
   z-index: 650 !important;
 }
-
 .leaflet-popup-pane {
   z-index: 700 !important;
+}
+
+/* Custom pin styling */
+.coverage-pin {
+  background: transparent !important;
+  border: none !important;
 }
 </style>
