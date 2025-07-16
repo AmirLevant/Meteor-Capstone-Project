@@ -1,17 +1,14 @@
 from flask import Blueprint, jsonify, request
 import sys
 
-# Add parent directory to path for imports
 sys.path.append('..')
 import database
 import models
 
-# Create driver blueprint
 driver_bp = Blueprint('driver', __name__)
 
 @driver_bp.route('/api/assign_driver', methods=['POST'])
 def assign_driver():
-    """Assign a driver to an existing route"""
     data = request.json
     driver_name = data.get("driver_name")
     route_id = data.get("route_id")
@@ -32,7 +29,6 @@ def assign_driver():
 
 @driver_bp.route('/api/driver', methods=['POST'])
 def add_driver():
-    """Add a new driver to the database"""
     data = request.json
     required = ["name", "email", "password"]
     if not all(field in data for field in required):
@@ -50,7 +46,6 @@ def add_driver():
 
 @driver_bp.route('/api/driver/location', methods=['PUT'])
 def update_driver_position():
-    """Update driver's current location"""
     data = request.json
     required = ["email", "location", "last_update"]
     if not all(field in data for field in required):
@@ -73,7 +68,6 @@ def update_driver_position():
 
 @driver_bp.route('/api/driver/location', methods=['GET'])
 def get_driver_position():
-    """Get driver's current location in GeoJSON format"""
     email = request.args.get("email")
     if not email:
         return jsonify({"error": "Email query parameter is required"}), 400

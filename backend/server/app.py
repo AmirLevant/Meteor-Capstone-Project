@@ -3,18 +3,14 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 
-# Load environment variables
 load_dotenv()
 
-# Import blueprints
+# controllers imports
 from controllers.plow_controller import plow_bp
 from controllers.route_controller import route_bp
 from controllers.driver_controller import driver_bp
 
-# Initialize Flask app
 meteor_app = Flask(__name__)
-
-# Configure CORS
 CORS(meteor_app, resources={
     r"/api/*": {
         "origins": ["http://localhost:5173"],
@@ -23,12 +19,10 @@ CORS(meteor_app, resources={
     }
 })
 
-# Register blueprints
 meteor_app.register_blueprint(plow_bp)
 meteor_app.register_blueprint(route_bp)
 meteor_app.register_blueprint(driver_bp)
 
-# Root endpoint
 @meteor_app.route('/')
 def home():
     return "Meteor App is running!"

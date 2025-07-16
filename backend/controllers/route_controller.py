@@ -8,20 +8,16 @@ from datetime import datetime
 import os
 import sys
 
-# Add parent directory to path for imports
 sys.path.append('..')
 import database
 import models
 
-# Create route blueprint
 route_bp = Blueprint('route', __name__)
 
-# Get API key from environment
 API_KEY = os.getenv('API_KEY')
 
 @route_bp.route('/api/routes/create', methods=['POST', 'OPTIONS'])
 def create_route():
-    """Create route for coverage area"""
     # Handle CORS preflight request
     if request.method == 'OPTIONS':
         response = jsonify({'status': 'OK'})
@@ -90,7 +86,6 @@ def create_route():
 
 @route_bp.route('/api/get_route', methods=['POST'])
 def optimized_route():
-    """Get optimized route from coordinates"""
     data = request.json
     coordinates = data.get('coordinates')
 
@@ -116,10 +111,7 @@ def optimized_route():
 
     return jsonify(route_data)
 
-# Helper functions
 def get_roads_within_radius(center, radius_km):
-    """Get actual roads within radius using Mapbox API"""
-    # Get Mapbox access token from environment
     mapbox_token = API_KEY
     
     if not mapbox_token:
@@ -129,12 +121,9 @@ def get_roads_within_radius(center, radius_km):
     print(f"Getting real roads within {radius_km}km of {center['lat']}, {center['lng']}")
     
     try:
-        # Use Mapbox Directions API to get actual road network
-        # Create a bounding box around the center point
-        lat_delta = radius_km / 111  # Approximate km per degree of latitude
+        lat_delta = radius_km / 111
         lng_delta = radius_km / (111 * math.cos(math.radians(center['lat'])))
         
-        # Get roads using Overpass API (OpenStreetMap data) - more reliable for road segments
         return get_roads_from_overpass(center, radius_km)
         
     except Exception as e:
@@ -142,15 +131,11 @@ def get_roads_within_radius(center, radius_km):
         return get_roads_from_overpass(center, radius_km)
 
 def get_roads_from_overpass(center, radius_km):
-    """Get actual roads from OpenStreetMap via Overpass API"""
     try:
-        # Convert radius to meters
         radius_meters = radius_km * 1000
         
-        # Overpass API query for roads within radius
         overpass_url = "http://overpass-api.de/api/interpreter"
         
-        # Query for roads (highways) within the radius
         overpass_query = f"""
         [out:json][timeout:25];
         (
@@ -170,10 +155,8 @@ def get_roads_from_overpass(center, radius_km):
             
             for element in data.get('elements', []):
                 if element.get('type') == 'way' and element.get('geometry'):
-                    # Convert OSM way to our road format
                     coordinates = [[node['lon'], node['lat']] for node in element['geometry']]
                     
-                    # Only include roads that have multiple points
                     if len(coordinates) >= 2:
                         road = {
                             'id': f"osm_way_{element['id']}",
@@ -203,8 +186,7 @@ def get_roads_from_overpass(center, radius_km):
         return []
 
 def calculate_distance(lat1, lng1, lat2, lng2):
-    """Calculate distance between two points using Haversine formula"""
-    R = 6371  # Earth's radius in kilometers
+    R = 6371
     
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
@@ -219,5 +201,4 @@ def calculate_distance(lat1, lng1, lat2, lng2):
     return R * c
 
 def generate_route_id():
-    """Generate unique route ID"""
     return f'route_{int(time.time())}_{random.randint(1000, 9999)}'
