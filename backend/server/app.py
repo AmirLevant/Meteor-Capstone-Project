@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 load_dotenv()
 
 # controllers imports
-from backend.controllers.manager_controller import plow_bp
+from controllers.manager_controller import plow_bp
 from controllers.route_controller import route_bp
 from controllers.driver_controller import driver_bp
 
