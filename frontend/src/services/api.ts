@@ -21,5 +21,13 @@ export const api = {
   async updatePlowStatus(id: number, status: any) {
     const response = await axios.patch(`${API_BASE_URL}/api/plows/${id}/status`, status)
     return response.data
+  },
+
+  async createRoute(center: { lat: number, lng: number }, radius: number) {
+    const response = await axios.post(`${API_BASE_URL}/api/routes/create`, {
+      center,
+      radius
+    })
+    return response.data
   }
 }
