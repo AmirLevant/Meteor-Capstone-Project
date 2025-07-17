@@ -1,22 +1,55 @@
-from flask import Blueprint, jsonify, request
+from flask import Flask, jsonify, request, Blueprint
+from flask_cors import CORS
 from urllib import response
+from dotenv import load_dotenv
+import os
 import requests
 import math
 import time
 import random
 from datetime import datetime
-import os
+
 import sys
 
-sys.path.append('..')
+sys.path.append('..') # Needed for the app.py to index and view the controllers folder
 import database
 import models
 
-route_bp = Blueprint('route', __name__)
-
+load_dotenv() # Needed for getting the environmental variable API_KEY from the .env file
 API_KEY = os.getenv('API_KEY')
 
-@route_bp.route('/api/routes/create', methods=['POST', 'OPTIONS'])
+route_bp = Blueprint('route', __name__)
+
+# controllers imports
+from controllers.driver_controller import driver_bp
+
+meteor_app = Flask(__name__)
+CORS(meteor_app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
+meteor_app.register_blueprint(driver_bp)
+
+
+@meteor_app.route('/') # when someone visits the root URL, we run the function home
+def home():
+    return "Meteor App is running!"
+
+@meteor_app.route('/api/plows')
+def get_plows():
+    return {
+        "plows": [
+            {"id": 1, "name": "Plow Alpha", "lat": 45.5017, "lng": -73.5673},
+            {"id": 2, "name": "Plow Beta", "lat": 45.5088, "lng": -73.5878}
+        ]
+    }
+
+# NEW: Route creation endpoint for coverage area
+@meteor_app.route('/api/routes/create', methods=['POST', 'OPTIONS'])
 def create_route():
     # Handle CORS preflight request
     if request.method == 'OPTIONS':
@@ -84,34 +117,127 @@ def create_route():
             'details': str(e)
         }), 500
 
-@route_bp.route('/api/get_route', methods=['POST'])
-def optimized_route():
-    data = request.json
-    coordinates = data.get('coordinates')
+# NEW: Get all routes
+@meteor_app.route('/api/routes', methods=['GET'])
+def get_routes():
+    """Get all active routes from database"""
+    try:
+        # Get all coverage routes from database
+        coverage_routes = database.get_all_coverage_routes()
+        
+        routes_list = []
+        for coverage_route in coverage_routes:
+            # Get road segments for this route
+            road_segments = database.get_road_segments_by_route_id(coverage_route.route_id)
+            
+            # Convert road segments to the format expected by frontend
+            roads = []
+            for segment in road_segments:
+                road = {
+                    'id': segment.segment_id,
+                    'name': segment.name,
+                    'type': segment.road_type,
+                    'geometry': {
+                        'type': 'LineString',
+                        'coordinates': segment.coordinates
+                    },
+                    'properties': segment.properties
+                }
+                roads.append(road)
+            
+            # Build route response
+            route_data = {
+                'id': coverage_route.route_id,
+                'center': {
+                    'lat': coverage_route.center_lat,
+                    'lng': coverage_route.center_lng
+                },
+                'radius': coverage_route.radius,
+                'roads': roads,
+                'created_at': coverage_route.created_at,
+                'status': coverage_route.status
+            }
+            routes_list.append(route_data)
+        
+        print(f"Returning {len(routes_list)} routes from database")
+        return jsonify({
+            'success': True,
+            'routes': routes_list,
+            'count': len(routes_list)
+        })
+    except Exception as e:
+        print(f"Error getting routes from database: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get routes',
+            'details': str(e)
+        }), 500
 
-    if not coordinates or len(coordinates) < 2:
-        return jsonify({'error': 'Requires two roads to make a route.'}), 400
-
-    coordinates = ';'.join([f"{pt['lng']},{pt['lat']}" for pt in coordinates])
-    
-    url = f"https://api.mapbox.com/optimized-trips/v1/mapbox/driving/{coordinates}"
-    params = {
-        'access_token': API_KEY,
-        'geometries': 'geojson',
-        'overview': 'full',
-        'source': 'first',
-        'destination': 'last'
-    }
-
-    response = requests.get(url, params=params)
-
-    route_data = response.json()
-    route = models.Route(driver_id=None, route_json=route_data)
-    database.insert_route(route)
-
-    return jsonify(route_data)
+# NEW: Get route by ID
+@meteor_app.route('/api/routes/<route_id>', methods=['GET'])
+def get_route_by_id(route_id):
+    """Get a specific route by ID from database"""
+    try:
+        # Get coverage route from database
+        coverage_route = database.get_coverage_route_by_id(route_id)
+        if not coverage_route:
+            return jsonify({
+                'success': False,
+                'error': 'Route not found'
+            }), 404
+        
+        # Get road segments for this route
+        road_segments = database.get_road_segments_by_route_id(route_id)
+        
+        # Convert road segments to the format expected by frontend
+        roads = []
+        for segment in road_segments:
+            road = {
+                'id': segment.segment_id,
+                'name': segment.name,
+                'type': segment.road_type,
+                'geometry': {
+                    'type': 'LineString',
+                    'coordinates': segment.coordinates
+                },
+                'properties': segment.properties
+            }
+            roads.append(road)
+        
+        # Build route response
+        route_data = {
+            'id': coverage_route.route_id,
+            'center': {
+                'lat': coverage_route.center_lat,
+                'lng': coverage_route.center_lng
+            },
+            'radius': coverage_route.radius,
+            'roads': roads,
+            'created_at': coverage_route.created_at,
+            'status': coverage_route.status
+        }
+        
+        print(f"Returning route {route_id} with {len(roads)} roads from database")
+        return jsonify({
+            'success': True,
+            'route': route_data
+        })
+    except Exception as e:
+        print(f"Error getting route {route_id} from database: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get route',
+            'details': str(e)
+        }), 500
 
 def get_roads_within_radius(center, radius_km):
+    """Get actual roads within radius using Mapbox API"""
+    
+    # Get Mapbox access token from environment
     mapbox_token = API_KEY
     
     if not mapbox_token:
@@ -121,9 +247,12 @@ def get_roads_within_radius(center, radius_km):
     print(f"Getting real roads within {radius_km}km of {center['lat']}, {center['lng']}")
     
     try:
-        lat_delta = radius_km / 111
+        # Use Mapbox Directions API to get actual road network
+        # Create a bounding box around the center point
+        lat_delta = radius_km / 111  # Approximate km per degree of latitude
         lng_delta = radius_km / (111 * math.cos(math.radians(center['lat'])))
         
+        # Get roads using Overpass API (OpenStreetMap data) - more reliable for road segments
         return get_roads_from_overpass(center, radius_km)
         
     except Exception as e:
@@ -131,11 +260,15 @@ def get_roads_within_radius(center, radius_km):
         return get_roads_from_overpass(center, radius_km)
 
 def get_roads_from_overpass(center, radius_km):
+    """Get actual roads from OpenStreetMap via Overpass API"""
     try:
+        # Convert radius to meters
         radius_meters = radius_km * 1000
         
+        # Overpass API query for roads within radius
         overpass_url = "http://overpass-api.de/api/interpreter"
         
+        # Query for roads (highways) within the radius
         overpass_query = f"""
         [out:json][timeout:25];
         (
@@ -155,8 +288,10 @@ def get_roads_from_overpass(center, radius_km):
             
             for element in data.get('elements', []):
                 if element.get('type') == 'way' and element.get('geometry'):
+                    # Convert OSM way to our road format
                     coordinates = [[node['lon'], node['lat']] for node in element['geometry']]
                     
+                    # Only include roads that have multiple points
                     if len(coordinates) >= 2:
                         road = {
                             'id': f"osm_way_{element['id']}",
@@ -185,8 +320,11 @@ def get_roads_from_overpass(center, radius_km):
         print(f"Error getting roads from Overpass API: {e}")
         return []
 
+# Remove the generate_simulated_roads function - we're getting real roads now!
+
 def calculate_distance(lat1, lng1, lat2, lng2):
-    R = 6371
+    """Calculate distance between two points using Haversine formula"""
+    R = 6371  # Earth's radius in kilometers
     
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
@@ -201,4 +339,128 @@ def calculate_distance(lat1, lng1, lat2, lng2):
     return R * c
 
 def generate_route_id():
+    """Generate unique route ID"""
     return f'route_{int(time.time())}_{random.randint(1000, 9999)}'
+
+# Currently takes and returns a json for the coordinates and route as a POST to get the information for the api call. with this format
+#{
+# "coordinates": [
+#    {"lat": 45.5017, "lng": -73.5673},
+#    {"lat": 45.5088, "lng": -73.5878},
+#    {"lat": 45.5123, "lng": -73.5699}
+# ]
+#}
+@meteor_app.route('/api/get_route', methods=['POST'])
+def optimized_route():
+    
+    data = request.json
+    coordinates = data.get('coordinates')
+
+    if not coordinates or len(coordinates) < 2:
+        return jsonify({'error': 'Requires two roads to make a route.'}), 400
+
+    coordinates = ';'.join([f"{pt['lng']},{pt['lat']}" for pt in coordinates])
+    
+    url = f"https://api.mapbox.com/optimized-trips/v1/mapbox/driving/{coordinates}"
+    params = {
+        'access_token': API_KEY,
+        'geometries': 'geojson',
+        'overview': 'full',
+        'source': 'first',
+        'destination': 'last'
+    }
+
+    #Inserts route into database
+    route_data = response.json()
+    route = models.Route(driver_id=None, route_json=route_data)
+    inserted_id = database.insert_route(route)
+
+    route = request.get(url, params=params)
+    return jsonify(response.json())
+
+# Allows for the adding of a driver to an existing route in the database
+@meteor_app.route('/api/assign_driver', methods=['POST'])
+def assign_driver():
+    data = request.json
+    driver_name = data.get("driver_name")
+    route_id = data.get("route_id")
+
+    if not driver_name or not route_id:
+        return jsonify({"error": "Missing driver_name or route_id"}), 400
+
+    driver_data = database.get_driver_by_name(driver_name)
+    if not driver_data:
+        return jsonify({"error": "Driver not found"}), 404
+
+    driver_id = str(driver_data["_id"])
+    success = database.assign_driver_to_route(route_id, driver_id)
+
+# Allows for the front-end to add a driver to the database.
+@meteor_app.route('/api/driver', methods=['POST'])
+def add_driver():
+    data = request.json
+    required = ["name", "email", "password", "latitude", "longitude", "last_update"]
+    if not all(field in data for field in required):
+        return jsonify({"error": "Missing required driver fields"}), 400
+
+    driver = models.Driver(
+        name=data["name"],
+        email=data["email"],
+        password=data["password"],
+        latitude=data["latitude"],
+        longitude=data["longitude"],
+        last_update=data["last_update"]
+    )
+
+# Allow for updating an existing driver's location by giving a geoJSON
+@meteor_app.route('/api/driver/location', methods=['PUT'])
+def update_driver_pos():
+    data = request.json
+    required = ["email", "location", "last_update"]
+    if not all(field in data for field in required):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    location = data["location"]
+    longitude, latitude = location["coordinates"]
+
+    updated = database.update_driver_location(
+        email=data["email"],
+        longitude=longitude,
+        latitude=latitude,
+        timestamp=data["last_update"]
+    )
+
+    if not updated:
+        return jsonify({"error": "Driver not found or update failed"}), 404
+
+    return jsonify({"message": "Location updated successfully"})
+
+
+# Allows for getting an existing driver's location in GeoJSON format
+@meteor_app.route('/api/driver/location', methods=['GET'])
+def get_driver_location():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"error": "Email query parameter is required"}), 400
+
+    driver = database.get_driver_by_email(email)
+    if not driver:
+        return jsonify({"error": "Driver not found"}), 404
+
+    geojson_feature = {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": driver.location["coordinates"]
+        },
+        "properties": {
+            "name": driver.name,
+            "email": driver.email,
+            "last_update": driver.last_update
+        }
+    }
+
+    return jsonify(geojson_feature)
+
+if __name__ == '__main__':
+    meteor_app.run(host='localhost', port=5000, debug=True)
