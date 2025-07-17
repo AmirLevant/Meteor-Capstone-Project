@@ -29,7 +29,7 @@ def get_driver_by_email(email: str):
 def get_driver_by_id(id: str):
     drivers_collection = db["drivers"]
 
-    driver_data = drivers_collection.find_one({"_id": id})
+    driver_data = drivers_collection.find_one({"_id": ObjectId(id)})
     if driver_data:
         return models.Driver.from_dict(driver_data)
     
@@ -37,16 +37,15 @@ def get_driver_by_id(id: str):
 def delete_driver_by_id(id: str):
     drivers_collection = db["drivers"]
 
-    delete_result = drivers_collection.delete_one({"_id:": id})
-    if delete_result:
-        return delete_result
+    delete_result = drivers_collection.delete_one({"_id": ObjectId(id)})
+    return delete_result.deleted_count > 0
 
 # Finds a driver by name from the database
 def get_driver_by_name(name: str):
     drivers_collection = db["drivers"]
     driver_data = drivers_collection.find_one({"name": name})
     if driver_data:
-        return driver_data
+        return models.Driver.from_dict(driver_data)
 
 # Updates an existing drivers location based on given email
 def update_driver_location(email: str, longitude: float, latitude: float, timestamp: str):
@@ -94,7 +93,8 @@ def update_position_by_id(id: str, new_location, new_timestamp):
 # Deletes a position by ID from the database then returns the id of the deleted position
 def delete_position_by_id(id: str):
     collection = db["positions"]
-    return collection.delete_one({"_id": ObjectId(id)})
+    result = collection.delete_one({"_id": ObjectId(id)})
+    return result.deleted_count > 0
 
 #######################################################################################################
 
@@ -120,11 +120,11 @@ def get_historical_data_by_id(id: str):
     if data:
         return models.HistoricalData.from_dict(data)
 
-# Finds and deletes a driver from the database by ID
+# Finds and deletes historical data from the database by ID
 def delete_historical_data_by_id(id: str):
     collection = db["historical_data"]
     result = collection.delete_one({"_id": ObjectId(id)})
-    return result
+    return result.deleted_count > 0
 
 #######################################################################################################
 
@@ -154,7 +154,7 @@ def get_road_by_id(id: str):
 def delete_road_by_id(id: str):
     collection = db["roads"]
     result = collection.delete_one({"_id": ObjectId(id)})
-    return result
+    return result.deleted_count > 0
 
 #######################################################################################################
 
@@ -166,10 +166,10 @@ def insert_route(route: models.Route):
     result = collection.insert_one(route.to_dict())
     return str(result.inserted_id)
 
-# Inserts a route into the database and returns a string matching the inserted model's id
+# Gets a route by driver_id
 def get_route_by_driver_id(driver_id: str):
     collection = db["routes"]
-    data = collection.find_one({"route_information.driver_id": driver_id})
+    data = collection.find_one({"driver_id": driver_id})
     if data:
         return models.Route.from_dict(data)
 
@@ -184,7 +184,7 @@ def get_route_by_id(id: str):
 def delete_route_by_id(id: str):
     collection = db["routes"]
     result = collection.delete_one({"_id": ObjectId(id)})
-    return result
+    return result.deleted_count > 0
 
 # Allows adding a driver to the route.
 def assign_driver_to_route(route_id: str, driver_id: str):
@@ -193,8 +193,101 @@ def assign_driver_to_route(route_id: str, driver_id: str):
         {"_id": ObjectId(route_id)},
         {"$set": {"driver_id": driver_id}}
     )
-    return result
+    return result.modified_count > 0
 
+#######################################################################################################
+
+# Coverage Route Functions:
+
+# Insert a coverage route into the database
+def insert_coverage_route(coverage_route):
+    try:
+        collection = db["coverage_routes"]
+        result = collection.insert_one(coverage_route.to_dict())
+        return str(result.inserted_id)
+    except Exception as e:
+        print(f"Error inserting coverage route: {e}")
+        return None
+
+# Get all coverage routes
+def get_all_coverage_routes():
+    try:
+        collection = db["coverage_routes"]
+        routes = []
+        for route_data in collection.find({"status": "active"}):
+            route = models.CoverageRoute.from_dict(route_data)
+            routes.append(route)
+        return routes
+    except Exception as e:
+        print(f"Error getting coverage routes: {e}")
+        return []
+
+# Get coverage route by route_id
+def get_coverage_route_by_id(route_id):
+    try:
+        collection = db["coverage_routes"]
+        route_data = collection.find_one({"route_id": route_id})
+        if route_data:
+            return models.CoverageRoute.from_dict(route_data)
+        return None
+    except Exception as e:
+        print(f"Error getting coverage route by id: {e}")
+        return None
+
+# Update coverage route status
+def update_coverage_route_status(route_id, status):
+    try:
+        collection = db["coverage_routes"]
+        result = collection.update_one(
+            {"route_id": route_id},
+            {"$set": {"status": status}}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error updating coverage route status: {e}")
+        return False
+
+#######################################################################################################
+
+# Road Segment Functions:
+
+# Insert multiple road segments for a route
+def insert_road_segments(road_segments):
+    try:
+        collection = db["road_segments"]
+        if not road_segments:
+            return []
+        
+        # Convert to dictionaries
+        segment_dicts = [segment.to_dict() for segment in road_segments]
+        result = collection.insert_many(segment_dicts)
+        return [str(id) for id in result.inserted_ids]
+    except Exception as e:
+        print(f"Error inserting road segments: {e}")
+        return []
+
+# Get all road segments for a route
+def get_road_segments_by_route_id(route_id):
+    try:
+        collection = db["road_segments"]
+        segments = []
+        for segment_data in collection.find({"route_id": route_id}):
+            segment = models.RoadSegment.from_dict(segment_data)
+            segments.append(segment)
+        return segments
+    except Exception as e:
+        print(f"Error getting road segments for route {route_id}: {e}")
+        return []
+
+# Delete all road segments for a route
+def delete_road_segments_by_route_id(route_id):
+    try:
+        collection = db["road_segments"]
+        result = collection.delete_many({"route_id": route_id})
+        return result.deleted_count
+    except Exception as e:
+        print(f"Error deleting road segments for route {route_id}: {e}")
+        return 0
 
 #######################################################################################################
 
@@ -220,8 +313,8 @@ def get_snow_condition_by_id(id: str):
     if data:
         return models.SnowCondition.from_dict(data)
 
-# Finds and deletes a route from the database by ID
+# Finds and deletes a snow condition from the database by ID
 def delete_snow_condition_by_id(id: str):
     collection = db["snow_conditions"]
     result = collection.delete_one({"_id": ObjectId(id)})
-    return result
+    return result.deleted_count > 0
