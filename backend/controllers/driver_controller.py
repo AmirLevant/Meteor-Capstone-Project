@@ -7,6 +7,40 @@ import models
 
 driver_bp = Blueprint('driver', __name__)
 
+@driver_bp.route('/api/drivers/available')
+def get_available_drivers():
+    # Get all drivers who don't have active routes
+    drivers = database.get_all_drivers()
+    
+    # For now, return sample data
+    return jsonify({
+        "drivers": [
+            {"id": "1", "name": "John Smith", "email": "john@example.com"},
+            {"id": "2", "name": "Jane Doe", "email": "jane@example.com"},
+            {"id": "3", "name": "Bob Wilson", "email": "bob@example.com"}
+        ]
+    })
+
+@driver_bp.route('/api/driver/my-route')
+def get_my_route():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"error": "Email parameter required"}), 400
+    
+    driver = database.get_driver_by_email(email)
+    if not driver:
+        return jsonify({"error": "Driver not found"}), 404
+    
+    # Get driver's assigned route
+    route = database.get_route_by_driver_id(str(driver._id))
+    if not route:
+        return jsonify({"error": "No route assigned"}), 404
+    
+    return jsonify({
+        "route": route.route_json,
+        "driver_name": driver.name
+    })
+
 @driver_bp.route('/api/assign_driver', methods=['POST'])
 def assign_driver():
     data = request.json

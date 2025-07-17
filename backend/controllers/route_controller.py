@@ -38,6 +38,7 @@ def create_route():
             
         center = data['center']
         radius = data['radius']
+        drivers = data.get('drivers', [])
         
         if not center.get('lat') or not center.get('lng'):
             return jsonify({
@@ -59,22 +60,46 @@ def create_route():
         # Get roads within the radius using Mapbox API
         roads = get_roads_within_radius(center, radius)
         
-        # Create route record
-        route = {
-            'id': generate_route_id(),
-            'center': center,
-            'radius': radius,
-            'roads': roads,
-            'created_at': datetime.now().isoformat(),
-            'status': 'active'
-        }
-        
-        return jsonify({
-            'success': True,
-            'route': route,
-            'roads': roads,
-            'message': f'Found {len(roads)} road segments within {radius}km radius'
-        })
+        # If drivers are provided, divide the area into sectors
+        if drivers and len(drivers) > 0:
+            sectors = divide_coverage_into_sectors(center, radius, roads, drivers)
+            
+            # Store each driver's route
+            for sector in sectors:
+                driver_route = models.Route(
+                    driver_id=sector['driver_id'],
+                    route_json={
+                        'center': center,
+                        'radius': radius,
+                        'sector': sector['sector_info'],
+                        'roads': sector['roads'],
+                        'color': sector['color']
+                    }
+                )
+                database.insert_route(driver_route)
+            
+            return jsonify({
+                'success': True,
+                'sectors': sectors,
+                'message': f'Created {len(sectors)} route sectors for {len(drivers)} drivers'
+            })
+        else:
+            # Original behavior - no drivers specified
+            route = {
+                'id': generate_route_id(),
+                'center': center,
+                'radius': radius,
+                'roads': roads,
+                'created_at': datetime.now().isoformat(),
+                'status': 'active'
+            }
+            
+            return jsonify({
+                'success': True,
+                'route': route,
+                'roads': roads,
+                'message': f'Found {len(roads)} road segments within {radius}km radius'
+            })
         
     except Exception as e:
         print(f"Error creating route: {e}")
@@ -202,3 +227,69 @@ def calculate_distance(lat1, lng1, lat2, lng2):
 
 def generate_route_id():
     return f'route_{int(time.time())}_{random.randint(1000, 9999)}'
+
+def divide_coverage_into_sectors(center, radius, roads, drivers):
+    sectors = []
+    num_drivers = len(drivers)
+    angle_per_driver = 360 / num_drivers
+    
+    # Define colors for sectors
+    colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
+    
+    for i, driver in enumerate(drivers):
+        start_angle = i * angle_per_driver
+        end_angle = (i + 1) * angle_per_driver
+        
+        # Filter roads for this sector
+        sector_roads = []
+        for road in roads:
+            if road_in_sector(road, center, start_angle, end_angle):
+                sector_roads.append(road)
+        
+        sector = {
+            'driver_id': driver.get('id'),
+            'driver_name': driver.get('name'),
+            'sector_info': {
+                'start_angle': start_angle,
+                'end_angle': end_angle,
+                'index': i
+            },
+            'roads': sector_roads,
+            'color': colors[i % len(colors)]
+        }
+        sectors.append(sector)
+    
+    return sectors
+
+def road_in_sector(road, center, start_angle, end_angle):
+    # Check if any point of the road is within the sector
+    if road.get('geometry') and road['geometry'].get('coordinates'):
+        for coord in road['geometry']['coordinates']:
+            lng, lat = coord
+            angle = calculate_bearing(center['lat'], center['lng'], lat, lng)
+            
+            # Normalize angle to 0-360
+            angle = (angle + 360) % 360
+            
+            # Check if angle is within sector
+            if start_angle <= angle <= end_angle:
+                return True
+            # Handle wraparound case (e.g., sector from 350 to 10 degrees)
+            if start_angle > end_angle and (angle >= start_angle or angle <= end_angle):
+                return True
+    
+    return False
+
+def calculate_bearing(lat1, lng1, lat2, lng2):
+    # Calculate bearing from point 1 to point 2
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    lng_diff = math.radians(lng2 - lng1)
+    
+    x = math.sin(lng_diff) * math.cos(lat2_rad)
+    y = math.cos(lat1_rad) * math.sin(lat2_rad) - math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(lng_diff)
+    
+    bearing = math.atan2(x, y)
+    bearing = math.degrees(bearing)
+    
+    return bearing
