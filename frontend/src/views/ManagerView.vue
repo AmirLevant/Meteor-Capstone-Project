@@ -353,9 +353,9 @@ const displayRouteOnMap = (roads) => {
   const L = window.L || leaflet
   
   roads.forEach(road => {
-    if (road.geometry && road.geometry.coordinates) {
-      // Convert coordinates to Leaflet format [lat, lng]
-      const latlngs = road.geometry.coordinates.map(coord => [coord[1], coord[0]])
+    if (road.coordinates && road.coordinates.length >= 2) {
+      // Convert coordinates to Leaflet format [lat, lng] - coordinates are now direct array
+      const latlngs = road.coordinates.map(coord => [coord[1], coord[0]])
       
       // Add road as a polyline
       const polyline = L.polyline(latlngs, {
