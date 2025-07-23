@@ -24,6 +24,24 @@
         map-id="driver-map"
         @map-ready="onMapReady"
       />
+
+      <!-- Find My Location Button -->
+      <div class="absolute top-4 right-4 z-[800]">
+        <button
+          @click="findMyLocation"
+          :disabled="locationLoading"
+          class="bg-white rounded-lg shadow-lg p-3 hover:bg-gray-50 transition-colors disabled:bg-gray-100"
+          title="Find my location"
+        >
+          <svg v-if="!locationLoading" class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <svg v-else class="w-6 h-6 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+        </button>
+      </div>
      
       <!-- Driver Controls Overlay -->
       <div class="absolute bottom-6 left-6 right-6 z-[800]">
@@ -139,6 +157,7 @@ const selectedRoute = ref(null)
 const routesLoading = ref(false)
 const mapInstance = ref(null)
 const routeMapLayers = ref([])
+const locationLoading = ref(false)
 
 // Computed
 const driverName = computed(() => appStore.driverInfo.name)
@@ -148,6 +167,55 @@ const driverEmail = computed(() => appStore.driverInfo.email)
 const goHome = () => {
   appStore.resetUser()
   router.push('/')
+}
+
+const findMyLocation = () => {
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser')
+    return
+  }
+
+  locationLoading.value = true
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords
+      console.log('Current location:', latitude, longitude)
+      
+      if (mapInstance.value) {
+        // Center map on current location with higher zoom for driver
+        mapInstance.value.setView([latitude, longitude], 17)
+      }
+      
+      locationLoading.value = false
+    },
+    (error) => {
+      console.error('Error getting location:', error)
+      let errorMessage = 'Unable to get your location. '
+      
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage += 'Please allow location access.'
+          break
+        case error.POSITION_UNAVAILABLE:
+          errorMessage += 'Location information unavailable.'
+          break
+        case error.TIMEOUT:
+          errorMessage += 'Location request timed out.'
+          break
+        default:
+          errorMessage += 'An unknown error occurred.'
+      }
+      
+      alert(errorMessage)
+      locationLoading.value = false
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  )
 }
 
 const saveDriverInfo = () => {
