@@ -57,20 +57,6 @@
           <h3 class="text-md font-semibold mt-6 mb-3">Actions</h3>
           <div class="space-y-2">
             <button 
-              @click="findMyLocation"
-              :disabled="locationLoading"
-              class="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
-            >
-              <svg v-if="!locationLoading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-              <svg v-else class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              {{ locationLoading ? 'Finding Location...' : 'Find My Location' }}
-            </button>
-            <button 
               @click="togglePinMode"
               :class="[
                 'w-full rounded-lg px-4 py-2 transition-colors',
@@ -205,7 +191,6 @@ const currentMarker = ref(null)
 const currentCircle = ref(null)
 const routeLoading = ref(false)
 const routeData = ref(null)
-const locationLoading = ref(false)
 
 // Configuration
 const minRadius = 0.5
@@ -229,55 +214,6 @@ const coverageAreaKm2 = computed(() => {
 const goHome = () => {
   appStore.resetUser()
   router.push('/')
-}
-
-const findMyLocation = () => {
-  if (!navigator.geolocation) {
-    alert('Geolocation is not supported by your browser')
-    return
-  }
-
-  locationLoading.value = true
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const { latitude, longitude } = position.coords
-      console.log('Current location:', latitude, longitude)
-      
-      if (mapInstance.value) {
-        // Center map on current location
-        mapInstance.value.setView([latitude, longitude], 15)
-      }
-      
-      locationLoading.value = false
-    },
-    (error) => {
-      console.error('Error getting location:', error)
-      let errorMessage = 'Unable to get your location. '
-      
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          errorMessage += 'Please allow location access.'
-          break
-        case error.POSITION_UNAVAILABLE:
-          errorMessage += 'Location information unavailable.'
-          break
-        case error.TIMEOUT:
-          errorMessage += 'Location request timed out.'
-          break
-        default:
-          errorMessage += 'An unknown error occurred.'
-      }
-      
-      alert(errorMessage)
-      locationLoading.value = false
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  )
 }
 
 const togglePinMode = () => {
