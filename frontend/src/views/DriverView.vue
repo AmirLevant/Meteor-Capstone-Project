@@ -26,7 +26,7 @@
       />
      
       <!-- Driver Controls Overlay -->
-      <div class="absolute bottom-6 left-6 right-6 z-[800]">
+      <div v-if="!isTracking" class="absolute bottom-6 left-6 right-6 z-[800]">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
           <div v-if="!driverName">
             <h3 class="text-lg font-semibold mb-3">Enter Your Information</h3>
@@ -125,6 +125,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div v-if="isTracking" class="absolute top-6 right-6 z-[800]">
+        <button @click="toggleTracking" class="bg-red-600 text-white rounded-lg px-4 py-2 shadow-lg hover:bg-red-700 transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          Stop Tracking
+        </button>
       </div>
     </div>
   </div>
